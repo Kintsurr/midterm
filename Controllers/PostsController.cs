@@ -22,9 +22,41 @@ namespace Reddit.Controllers
 
         // GET: api/Posts
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Post>>> GetPosts()
+        public async Task<ActionResult<IEnumerable<Post>>> GetPosts(int pageNumber, int pageSize, string sortKey = "id", bool isAssending = true, string searchKey = null)
         {
-            return await _context.Posts.ToListAsync();
+            var orderBy = string.IsNullOrWhiteSpace(sortKey) ? "id" : sortKey.ToLower();
+
+            var query = _context.Posts.AsQueryable();
+
+            // Apply search filtering if searchKey is not null or empty
+            if (!string.IsNullOrWhiteSpace(searchKey))
+            {
+                query = query.Where(c => c.Title.Contains(searchKey) || c.Content.Contains(searchKey));
+            }
+            
+            // Dynamic sorting based on the orderBy value
+            switch (orderBy)
+            {
+                case "createdat":
+                    query = isAssending ?
+                        query.OrderBy(c => c.CreateAt) :
+                        query.OrderByDescending(c => c.CreateAt);
+                    break;
+                case "positivity":
+                    query = isAssending ?
+                        query.OrderBy(c => c.Upvotes) :
+                        query.OrderByDescending(c => c.Upvotes);
+                    break;
+                case "id":
+                default:
+                    query = isAssending ?
+                        query.OrderBy(c => c.Id) :
+                        query.OrderByDescending(c => c.Id);
+                    break;
+            }
+            // Pagination
+            var pagedPosts = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync();
+            return pagedPosts;
         }
 
         // GET: api/Posts/5
